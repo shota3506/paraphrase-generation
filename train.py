@@ -1,7 +1,8 @@
 import os
+import argparse
+import sentencepiece as spm
 from tqdm import tqdm
 from statistics import mean
-import sentencepiece as spm
 
 import torch
 import torch.nn as nn
@@ -14,40 +15,47 @@ from dataset import ParaphraseDataset, PAD_INDEX, UNK_INDEX, BOS_INDEX, EOS_INDE
 
 device = torch.device("cuda:%d" % 0 if torch.cuda.is_available() else "cpu")
 
+parser = argparse.ArgumentParser()
+# Data
+parser.add_argument("--train_source_file", type=str, required=True)
+parser.add_argument("--train_target_file", type=str, required=True)
+parser.add_argument("--valid_source_file", type=str, required=True)
+parser.add_argument("--valid_target_file", type=str, required=True)
+parser.add_argument("--spm_file", type=str, required=True)
+# Model
+parser.add_argument("--d_model", type=int, default=256)
+parser.add_argument("--nhead", type=int, default=8)
+parser.add_argument("--num_encoder_layers", type=int, default=6)
+parser.add_argument("--num_decoder_layers", type=int, default=6)
+parser.add_argument("--dim_feedforward", type=int, default=512)
+parser.add_argument("--dropout", type=float, default=.1)
+# Optim
+parser.add_argument("--batch_size", type=int, default=64)
+parser.add_argument("--num_epochs", type=int, default=30)
+parser.add_argument("--print_every", type=int, default=100)
+parser.add_argument("--checkpoint_file", type=str, default="model.pth")
+# parser.add_argument("--log_file", type=str, required=True)
+
+args = parser.parse_args()
+
+
 def main() -> None:
-    data_dir = "data/quora"
-    train_src_file = os.path.join(data_dir, "train.src.txt")
-    train_ref_file = os.path.join(data_dir, "train.ref.txt")
-    valid_src_file = os.path.join(data_dir, "valid.src.txt")
-    valid_ref_file = os.path.join(data_dir, "valid.ref.txt")
-    
-    spm_file = "data/quora/spm.model"
-    vocabulary_size = len(spm.SentencePieceProcessor(model_file=spm_file))
-    train_dataset = ParaphraseDataset(train_src_file, train_ref_file, tokenizer=spm.SentencePieceProcessor(model_file=spm_file).encode)
-    valid_dataset = ParaphraseDataset(valid_src_file, valid_ref_file, tokenizer=spm.SentencePieceProcessor(model_file=spm_file).encode)
-    batch_size = 128
-    batch_size = 64
-    train_loader = DataLoader(train_dataset, batch_size, shuffle=True, collate_fn=train_dataset.collate_fn, drop_last=True)
-    valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False, collate_fn=valid_dataset.collate_fn, drop_last=True)
+    vocabulary_size = len(spm.SentencePieceProcessor(model_file=args.spm_file))
+    train_dataset = ParaphraseDataset(args.train_source_file, args.train_target_file, tokenizer=spm.SentencePieceProcessor(model_file=args.spm_file).encode)
+    valid_dataset = ParaphraseDataset(args.valid_source_file, args.valid_target_file, tokenizer=spm.SentencePieceProcessor(model_file=args.spm_file).encode)
+    train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, collate_fn=train_dataset.collate_fn, drop_last=True)
+    valid_loader = DataLoader(valid_dataset, args.batch_size, shuffle=False, collate_fn=valid_dataset.collate_fn, drop_last=True)
 
     ########## Self-Attention Network Encoder Decoder ##########
     from models.transformer import Transformer
-
-    d_model = 256
-    nhead = 8
-    num_encoder_layers = 6
-    num_decoder_layers = 6
-    dim_feedforward = 512
-    dropout = 0.1
-
     model = Transformer(
         num_embeddings=vocabulary_size,
-        d_model=d_model, 
-        nhead=nhead, 
-        num_encoder_layers=num_encoder_layers,
-        num_decoder_layers=num_decoder_layers, 
-        dim_feedforward=dim_feedforward, 
-        dropout=dropout).to(device)
+        d_model=args.d_model, 
+        nhead=args.nhead, 
+        num_encoder_layers=args.num_encoder_layers,
+        num_decoder_layers=args.num_decoder_layers, 
+        dim_feedforward=args.dim_feedforward, 
+        dropout=args.dropout).to(device)
     
     label_smoothing = 0.1
     warmup_step = 4000
@@ -56,12 +64,10 @@ def main() -> None:
     lr_lambda = lambda step: model.d_model**(-0.5) * min((step+1)**(-0.5), (step+1) * warmup_step**(-1.5))
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
-    epochs = 100
-    print_every = 100
-    for epoch in range(epochs):
+    for epoch in range(args.num_epochs):
         train_loss, valid_loss = 0., 0.
         pbar = tqdm(train_loader)
-        pbar.set_description("[Epoch %d/%d]" % (epoch, epochs))
+        pbar.set_description("[Epoch %d/%d]" % (epoch, args.num_epochs))
 
         # Train
         model.train()
@@ -82,7 +88,7 @@ def main() -> None:
             
             scheduler.step()
             train_loss += loss.item()
-            if itr % print_every == 0:
+            if itr % args.print_every == 0:
                 pbar.set_postfix(loss=train_loss / (itr + 1), lr=scheduler.get_last_lr()[0])
         train_loss /= len(train_loader)
 
@@ -104,7 +110,7 @@ def main() -> None:
                 
         print('Training   loss: %.2f\nValidation loss: %.2f' % (train_loss, valid_loss))
 
-        torch.save(model.state_dict(), "model.pth")
+        torch.save(model.state_dict(), args.checkpoint_file)
         
 if __name__ == "__main__":
     main()
