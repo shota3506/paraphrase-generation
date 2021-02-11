@@ -29,3 +29,8 @@ python generate.py \
 - ```input_file``` one-sentence-per-line raw corpus file to paraphrase. 
 - ```output_file``` output file
 - ```search_width``` beam search width.
+
+## Example
+### [Quora Question Pairs](https://www.kaggle.com/c/quora-question-pairs)
+Download data from [here](https://drive.google.com/drive/folders/1d8bfnRvSW0nD-EMlScyY47vIw8RoQda0?usp=sharing).
+Download trained model parameters and generated paraphrases from [here](https://drive.google.com/drive/folders/1MnyDvB9SQCkOLdjBjZqGU20RqzadDXaK?usp=sharing).
