@@ -37,8 +37,8 @@ class ParaphraseDataset(Dataset):
 
     def __getitem__(self, idx):
         src, tgt = self._source[idx], self._target[idx]
-        src = [BOS_INDEX] + self.tokenizer(src) + [EOS_INDEX]
-        tgt = [BOS_INDEX] + self.tokenizer(tgt) + [EOS_INDEX]
+        src = [BOS_INDEX] + self.tokenizer(src)[:self.max_length - 2] + [EOS_INDEX]
+        tgt = [BOS_INDEX] + self.tokenizer(tgt)[:self.max_length - 2] + [EOS_INDEX]
         return src, tgt
 
     @staticmethod
