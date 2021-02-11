@@ -1,5 +1,6 @@
 import os
 import argparse
+import logging
 import sentencepiece as spm
 from tqdm import tqdm
 from statistics import mean
@@ -29,17 +30,29 @@ parser.add_argument("--num_encoder_layers", type=int, default=6)
 parser.add_argument("--num_decoder_layers", type=int, default=6)
 parser.add_argument("--dim_feedforward", type=int, default=512)
 parser.add_argument("--dropout", type=float, default=.1)
+parser.add_argument("--label_smoothing", type=float, default=.1)
+parser.add_argument("--warmup_step", type=int, default=4000)
 # Optim
-parser.add_argument("--batch_size", type=int, default=64)
+parser.add_argument("--batch_size", type=int, default=128)
 parser.add_argument("--num_epochs", type=int, default=30)
 parser.add_argument("--print_every", type=int, default=100)
 parser.add_argument("--checkpoint_file", type=str, default="model.pth")
-# parser.add_argument("--log_file", type=str, required=True)
+parser.add_argument("--log_file", type=str, default="train.log")
 
 args = parser.parse_args()
 
 
 def main() -> None:
+    logger = logging.getLogger(__name__)
+    handler1 = logging.StreamHandler()
+    handler1.setLevel(logging.INFO)
+    handler2 = logging.FileHandler(filename=args.log_file, mode='w')
+    handler2.setFormatter(logging.Formatter("%(asctime)s %(levelname)8s %(message)s"))
+    handler2.setLevel(logging.INFO)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler1)
+    logger.addHandler(handler2)
+
     vocabulary_size = len(spm.SentencePieceProcessor(model_file=args.spm_file))
     train_dataset = ParaphraseDataset(args.train_source_file, args.train_target_file, tokenizer=spm.SentencePieceProcessor(model_file=args.spm_file).encode)
     valid_dataset = ParaphraseDataset(args.valid_source_file, args.valid_target_file, tokenizer=spm.SentencePieceProcessor(model_file=args.spm_file).encode)
@@ -57,13 +70,13 @@ def main() -> None:
         dim_feedforward=args.dim_feedforward, 
         dropout=args.dropout).to(device)
     
-    label_smoothing = 0.1
-    warmup_step = 4000
-    criterion = LabelSmoothedLmCrossEntropyLoss(PAD_INDEX, label_smoothing=label_smoothing, reduction='batchmean')
+    criterion = LabelSmoothedLmCrossEntropyLoss(PAD_INDEX, label_smoothing=args.label_smoothing, reduction='batchmean')
+
+    lr_lambda = lambda step: model.d_model**(-0.5) * min((step+1)**(-0.5), (step+1) * args.warmup_step**(-1.5))
     optimizer = torch.optim.Adam(model.parameters(), lr=1., betas=(0.9, 0.98), eps=1e-09)
-    lr_lambda = lambda step: model.d_model**(-0.5) * min((step+1)**(-0.5), (step+1) * warmup_step**(-1.5))
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
+    logger.info('Start training')
     for epoch in range(args.num_epochs):
         train_loss, valid_loss = 0., 0.
         pbar = tqdm(train_loader)
@@ -108,7 +121,7 @@ def main() -> None:
                 valid_loss += loss.item()
         valid_loss /= len(valid_loader)
                 
-        print('Training   loss: %.2f\nValidation loss: %.2f' % (train_loss, valid_loss))
+        logger.info('Training   loss: %.2f\nValidation loss: %.2f' % (train_loss, valid_loss))
 
         torch.save(model.state_dict(), args.checkpoint_file)
         
