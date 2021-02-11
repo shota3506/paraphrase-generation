@@ -25,11 +25,10 @@ parser.add_argument("--num_encoder_layers", type=int, default=6)
 parser.add_argument("--num_decoder_layers", type=int, default=6)
 parser.add_argument("--dim_feedforward", type=int, default=512)
 parser.add_argument("--dropout", type=float, default=.1)
-parser.add_argument("--batch_size", type=int, default=64)
+parser.add_argument("--batch_size", type=int, default=128)
 parser.add_argument("--checkpoint_file", type=str, default="model.pth")
 # Search
 parser.add_argument("--search_width", type=int, default=1)
-# parser.add_argument("--log_file", type=str, required=True)
 
 args = parser.parse_args()
 

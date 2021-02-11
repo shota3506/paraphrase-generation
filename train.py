@@ -121,8 +121,8 @@ def main() -> None:
                 valid_loss += loss.item()
         valid_loss /= len(valid_loader)
                 
-        logger.info('[Epoch %d] Training   loss: %.2f' % (epoch, train_loss))
-        logger.info('           Validation loss: %.2f' % valid_loss)
+        logger.info('[Epoch %3d] Training   loss: %.2f' % (epoch, train_loss))
+        logger.info('            Validation loss: %.2f' % valid_loss)
 
         torch.save(model.state_dict(), args.checkpoint_file)
         
