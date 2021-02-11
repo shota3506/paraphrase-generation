@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from search import BeamSearch, DiverseBeamSearch, RandomSample
 from dataset import ParaphraseDataset, PAD_INDEX, UNK_INDEX, BOS_INDEX, EOS_INDEX
 
-device = torch.device("cuda:%d" % 0 if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 # Data

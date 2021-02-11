@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from criterion import LmCrossEntropyLoss, LabelSmoothedLmCrossEntropyLoss
 from dataset import ParaphraseDataset, PAD_INDEX, UNK_INDEX, BOS_INDEX, EOS_INDEX
 
-device = torch.device("cuda:%d" % 0 if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 # Data
@@ -34,7 +34,7 @@ parser.add_argument("--label_smoothing", type=float, default=.1)
 parser.add_argument("--warmup_step", type=int, default=4000)
 # Optim
 parser.add_argument("--batch_size", type=int, default=128)
-parser.add_argument("--num_epochs", type=int, default=30)
+parser.add_argument("--num_epochs", type=int, default=50)
 parser.add_argument("--print_every", type=int, default=100)
 parser.add_argument("--checkpoint_file", type=str, default="model.pth")
 parser.add_argument("--log_file", type=str, default="train.log")
@@ -59,7 +59,7 @@ def main() -> None:
     train_loader = DataLoader(train_dataset, args.batch_size, shuffle=True, collate_fn=train_dataset.collate_fn, drop_last=True)
     valid_loader = DataLoader(valid_dataset, args.batch_size, shuffle=False, collate_fn=valid_dataset.collate_fn, drop_last=True)
 
-    ########## Self-Attention Network Encoder Decoder ##########
+    ########## Transformer Encoder Decoder ##########
     from models.transformer import Transformer
     model = Transformer(
         num_embeddings=vocabulary_size,
@@ -121,8 +121,9 @@ def main() -> None:
                 valid_loss += loss.item()
         valid_loss /= len(valid_loader)
                 
-        logger.info('[Epoch %3d] Training   loss: %.2f' % (epoch, train_loss))
-        logger.info('            Validation loss: %.2f' % valid_loss)
+        logger.info('[Epoch %d/%d] Training loss: %.2f, Validation loss: %.2f' % (
+            epoch, args.num_epochs, train_loss, valid_loss
+        ))
 
         torch.save(model.state_dict(), args.checkpoint_file)
         

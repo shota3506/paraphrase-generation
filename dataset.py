@@ -1,9 +1,9 @@
 import math
-import random
+from collections import OrderedDict, Counter
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from collections import OrderedDict, Counter
 
 PAD_INDEX = 0
 UNK_INDEX = 1
